@@ -14,7 +14,10 @@ Create and activate a dedicated conda environment:
 ```powershell
 conda create -n al-synth python=3.11 -y
 conda activate al-synth
-python -m pip install numpy pillow torch streamlit pandas
+# Use the provided requirements file to install Python deps.
+python -m pip install -r requirements.txt
+# If you require a CUDA-enabled PyTorch, follow the official selector and install
+# PyTorch with the appropriate CUDA runtime (https://pytorch.org/get-started/locally/).
 ```
 
 ## 2) Generate Dataset
@@ -80,13 +83,13 @@ Options:
 - `--seed-size`, `--rounds`, `--query-size`, `--strategy` (`entropy`|`margin`|`least_confidence`), `--diversity`, `--out-dir`, `--seed`.
 
 Dependencies:
-- `scikit-learn` (recommended), `numpy`, `pandas` (optional for analysis).
+- See `requirements.txt` for the baseline Python packages used by the project.
 
-Install into your conda env:
+Install into your conda env using the repository requirements:
 
 ```powershell
 conda activate al-synth
-conda install -y scikit-learn numpy pandas
+python -m pip install -r requirements.txt
 ```
 
 Outputs (default `artifacts/embedding_cnn/al_embeddings_results/`):
@@ -96,7 +99,52 @@ Outputs (default `artifacts/embedding_cnn/al_embeddings_results/`):
 
 Note: ensure embeddings exist before running (see the embedding CNN step above).
 
-## 4) Run Full-Loop Active Learning
+## 7) Comprehensive AL Experiments
+
+Run a full suite of AL experiments comparing:
+- **Classifiers**: Logistic Regression, Random Forest, SVC, Gradient Boosting
+- **Sampling Strategies**: Entropy, Margin, Least Confidence
+- **Diversity**: With and without embedding-space diversity
+- **Baselines**: Train on full dataset for comparison
+
+### Run All Experiments
+
+```powershell
+python scripts/run_al_experiments.py --embeddings-dir artifacts/embedding_cnn/embeddings --seed-size 1 --rounds 50 --query-size 1
+```
+
+Options:
+- `--seed-size`: initial labeled set size (default: 1)
+- `--rounds`: number of AL rounds (default: 50)
+- `--query-size`: samples per query (default: 1)
+- `--out-dir`: output directory for results (default: `artifacts/embedding_cnn/al_experiments`)
+
+### Outputs
+- `baseline_results.csv` — performance of each classifier trained on full training set
+- `all_al_curves.csv` — per-round test accuracy and F1 for all strategy-classifier combinations
+- `experiment_metadata.json` — experiment configuration and timestamp
+- Per-strategy subdirectories with individual classifier metrics
+
+### Analyze Results with Jupyter Notebook
+
+After running experiments, open and run the analysis notebook:
+
+```powershell
+jupyter notebook notebooks/al_analysis.ipynb
+```
+
+The notebook includes:
+1. Load baseline and AL experimental data
+2. Baseline metrics visualization
+3. Learning curves for each classifier across all strategies
+4. Comparison of sampling strategies
+5. Heatmap: final accuracy by strategy and classifier
+6. Summary statistics and rankings
+7. Export results and generate analysis report
+
+All plots are saved to `artifacts/embedding_cnn/al_experiments/` for reporting.
+
+## 5) Run Full-Loop Active Learning
 Run iterative AL rounds (train -> query -> add queried samples -> retrain):
 
 ```powershell
@@ -109,7 +157,7 @@ Active learning outputs (separate AL metrics):
 - Epoch history (per round): `artifacts/active_learning/al_epoch_history.csv`
 - AL run summary: `artifacts/active_learning/al_run_summary.json`
 
-## 5) Useful Variants
+## 6) Useful Variants
 Run with margin uncertainty:
 
 ```powershell
@@ -128,7 +176,7 @@ Use warm-start from the pretrained baseline weights in round 1:
 python -m src.active_learning.simulate --data-root data/synth_surface_defects --checkpoint artifacts/surface_classifier/best.pt --warm-start --rounds 5 --epochs-per-round 8 --strategy entropy --query-size 50 --seed-size 80
 ```
 
-## 6) Streamlit MVP App
+## 7) Streamlit MVP App
 Launch the app:
 
 ```powershell

@@ -73,11 +73,14 @@ def run_al_simulation(
     diversity: bool = False,
     out_dir: Path | None = None,
     seed: int = 42,
-) -> None:
+) -> dict[str, Any]:
+    """Run AL simulations with multiple sklearn classifiers and return aggregated results."""
     np.random.seed(seed)
     embeddings_dir = Path(embeddings_dir)
     out_dir = Path(out_dir or (embeddings_dir.parent / "al_embeddings_results"))
     out_dir.mkdir(parents=True, exist_ok=True)
+    
+    all_results: dict[str, dict[str, Any]] = {}
 
     # expected files: train_embeddings.npz, val_embeddings.npz, test_embeddings.npz
     train_npz = embeddings_dir / "train_embeddings.npz"
@@ -97,7 +100,7 @@ def run_al_simulation(
     unlabeled_idxs = list(idxs[seed_size:].tolist())
 
     classifiers = {
-        "logreg": LogisticRegression(max_iter=2000, solver="lbfgs", multi_class="auto"),
+        "logreg": LogisticRegression(max_iter=2000, solver="lbfgs"),
         "random_forest": RandomForestClassifier(n_estimators=200),
         "svc": SVC(probability=True),
         "gbdt": GradientBoostingClassifier(n_estimators=200),
@@ -117,28 +120,41 @@ def run_al_simulation(
             X_train = X_train_all[labeled]
             y_train = y_train_all[labeled]
 
-            clf.fit(X_train, y_train)
-
-            # eval on test
-            y_pred = clf.predict(X_test)
-            acc = float(accuracy_score(y_test, y_pred))
-            f1 = float(f1_score(y_test, y_pred, average="macro"))
+            # Check if we have at least 2 classes (required for classification)
+            unique_classes = len(np.unique(y_train))
+            can_train = unique_classes >= 2
+            
+            acc, f1 = 0.0, 0.0
+            if can_train:
+                clf.fit(X_train, y_train)
+                # eval on test
+                y_pred = clf.predict(X_test)
+                acc = float(accuracy_score(y_test, y_pred))
+                f1 = float(f1_score(y_test, y_pred, average="macro"))
+                print(f"  [round {r}] labeled={len(labeled)} pool={len(unlabeled)} acc={acc:.4f} f1={f1:.4f}")
+            else:
+                print(f"  [round {r}] labeled={len(labeled)} pool={len(unlabeled)} (skipped: only {unique_classes} class(es) in labeled set)")
 
             # query step
             pool_size_before = len(unlabeled)
             if unlabeled:
                 X_pool = X_train_all[unlabeled]
-                # some classifiers may not implement predict_proba; we used prob-capable models
-                probs = clf.predict_proba(X_pool)
-                util = uncertainty_from_probs(probs, strategy=strategy)
+                
+                if can_train:
+                    # Use model's uncertainty if we could train
+                    probs = clf.predict_proba(X_pool)
+                    util = uncertainty_from_probs(probs, strategy=strategy)
+                else:
+                    # Random selection if we couldn't train (all same utility)
+                    util = np.ones(len(unlabeled), dtype=np.float32)
 
                 actual_k = min(query_size, len(unlabeled))
-                if diversity:
+                if diversity and can_train:
                     chosen_local = greedy_diverse_topk(X_pool, util, actual_k)
                     chosen_idxs = [unlabeled[i] for i in chosen_local]
                 else:
-                    order = np.argsort(-util)
-                    chosen_local = order[:actual_k].tolist()
+                    order = np.argsort(-util)[:actual_k]
+                    chosen_local = order.tolist()
                     chosen_idxs = [unlabeled[i] for i in chosen_local]
 
                 # record queries
@@ -170,8 +186,6 @@ def run_al_simulation(
                 }
             )
 
-            print(f"  [round {r}] labeled={len(labeled)} pool={len(unlabeled)} acc={acc:.4f} f1={f1:.4f}")
-
             if not unlabeled:
                 print("  pool exhausted, stopping early")
                 break
@@ -190,7 +204,7 @@ def run_al_simulation(
             writer.writeheader()
             writer.writerows(queries_all)
 
-        # save run summary
+        # save run summary and collect statistics
         summary = {
             "classifier": name,
             "seed_size": seed_size,
@@ -202,6 +216,94 @@ def run_al_simulation(
         }
         with (out_dir / f"{name}_summary.json").open("w", encoding="utf-8") as f:
             json.dump(summary, f, indent=2)
+        
+        # collect stats for aggregated reporting
+        if metrics:
+            all_results[name] = {
+                "rounds": len(metrics),
+                "final_acc": metrics[-1]["test_acc"],
+                "best_acc": max(m["test_acc"] for m in metrics),
+                "avg_acc": np.mean([m["test_acc"] for m in metrics]),
+                "final_f1": metrics[-1]["test_f1_macro"],
+                "best_f1": max(m["test_f1_macro"] for m in metrics),
+                "avg_f1": np.mean([m["test_f1_macro"] for m in metrics]),
+                "final_labeled": summary["final_labeled"],
+                "metrics": metrics,
+            }
+    
+    # Generate aggregated visualization CSVs
+    _save_aggregated_metrics(all_results, out_dir)
+    _print_statistics(all_results)
+    
+    return all_results
+
+
+def _save_aggregated_metrics(all_results: dict[str, Any], out_dir: Path) -> None:
+    """Save aggregated metrics and curves for visualization."""
+    # CSV 1: Summary stats per classifier
+    summary_rows = []
+    for name, res in all_results.items():
+        summary_rows.append({
+            "classifier": name,
+            "rounds": res["rounds"],
+            "final_accuracy": round(res["final_acc"], 4),
+            "best_accuracy": round(res["best_acc"], 4),
+            "avg_accuracy": round(res["avg_acc"], 4),
+            "final_f1_macro": round(res["final_f1"], 4),
+            "best_f1_macro": round(res["best_f1"], 4),
+            "avg_f1_macro": round(res["avg_f1"], 4),
+            "final_labeled_samples": res["final_labeled"],
+        })
+    
+    summary_csv = out_dir / "al_summary_stats.csv"
+    with summary_csv.open("w", newline="", encoding="utf-8") as f:
+        if summary_rows:
+            writer = csv.DictWriter(f, fieldnames=summary_rows[0].keys())
+            writer.writeheader()
+            writer.writerows(summary_rows)
+    print(f"[SAVE] Aggregated summary: {summary_csv}")
+    
+    # CSV 2: Accuracy curves per classifier
+    curves_rows = []
+    for name, res in all_results.items():
+        for metric in res["metrics"]:
+            curves_rows.append({
+                "classifier": name,
+                "round": metric["round"],
+                "labeled_size": metric["labeled_size"],
+                "test_accuracy": round(metric["test_acc"], 4),
+                "test_f1_macro": round(metric["test_f1_macro"], 4),
+            })
+    
+    curves_csv = out_dir / "al_curves.csv"
+    with curves_csv.open("w", newline="", encoding="utf-8") as f:
+        if curves_rows:
+            writer = csv.DictWriter(f, fieldnames=curves_rows[0].keys())
+            writer.writeheader()
+            writer.writerows(curves_rows)
+    print(f"[SAVE] Accuracy curves: {curves_csv}")
+
+
+def _print_statistics(all_results: dict[str, Any]) -> None:
+    """Print human-readable statistics after simulation."""
+    print("\n" + "=" * 80)
+    print("AL SIMULATION SUMMARY")
+    print("=" * 80)
+    
+    for name, res in all_results.items():
+        print(f"\n[{name.upper()}]")
+        print(f"  Rounds completed:        {res['rounds']}")
+        print(f"  Final accuracy:          {res['final_acc']:.4f}")
+        print(f"  Best accuracy:           {res['best_acc']:.4f}")
+        print(f"  Average accuracy:        {res['avg_acc']:.4f}")
+        print(f"  Final F1 (macro):        {res['final_f1']:.4f}")
+        print(f"  Best F1 (macro):         {res['best_f1']:.4f}")
+        print(f"  Average F1 (macro):      {res['avg_f1']:.4f}")
+        print(f"  Final labeled samples:   {res['final_labeled']}")
+    
+    print("\n" + "=" * 80)
+    print("Visualization CSVs saved for plotting with matplotlib/plotly/etc.")
+    print("=" * 80)
 
 
 def parse_args() -> argparse.Namespace:

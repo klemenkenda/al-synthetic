@@ -1,0 +1,10 @@
+numpy>=1.24
+pillow>=9.0
+pandas>=2.0
+scikit-learn>=1.2
+streamlit>=1.20
+pytest>=7.0
+# PyTorch: prefer installing via Conda if you need CUDA-enabled builds.
+# For CPU-only or basic installs, pip can be used; adjust version/CUDA as needed.
+torch>=2.0
+torchvision>=0.15
