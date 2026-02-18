@@ -8,3 +8,5 @@ pytest>=7.0
 # For CPU-only or basic installs, pip can be used; adjust version/CUDA as needed.
 torch>=2.0
 torchvision>=0.15
+matplotlib>=3.5
+seaborn>=0.12
