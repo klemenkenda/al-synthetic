@@ -1,0 +1,32 @@
+{
+  "image": {
+    "width": 256,
+    "height": 256
+  },
+  "dataset": {
+    "num_images": 1000,
+    "splits": {
+      "train": 0.7,
+      "val": 0.15,
+      "test": 0.15
+    }
+  },
+  "classes": [
+    "none",
+    "scratch",
+    "pit_corrosion",
+    "stain",
+    "crack"
+  ],
+  "class_weights": {
+    "none": 0.25,
+    "scratch": 0.2,
+    "pit_corrosion": 0.2,
+    "stain": 0.2,
+    "crack": 0.15
+  },
+  "output": {
+    "root": "data/synth_surface_defects",
+    "export_masks": true
+  }
+}
