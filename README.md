@@ -65,6 +65,37 @@ Outputs:
   - `artifacts/embedding_cnn/embeddings/test_embeddings.npz`
   - index files `*_embeddings_index.csv`
 
+## Embeddings-based Active Learning Simulations
+
+Use precomputed embeddings with lightweight sklearn classifiers to simulate AL rounds (logistic regression, random forest, SVC, gradient boosting).
+
+Example usage:
+
+```powershell
+python -m src.active_learning.simulate_embeddings --embeddings-dir artifacts/embedding_cnn/embeddings --seed-size 80 --rounds 5 --query-size 50
+```
+
+Options:
+- `--embeddings-dir`: directory containing `*_embeddings.npz` files (default `artifacts/embedding_cnn/embeddings`).
+- `--seed-size`, `--rounds`, `--query-size`, `--strategy` (`entropy`|`margin`|`least_confidence`), `--diversity`, `--out-dir`, `--seed`.
+
+Dependencies:
+- `scikit-learn` (recommended), `numpy`, `pandas` (optional for analysis).
+
+Install into your conda env:
+
+```powershell
+conda activate al-synth
+conda install -y scikit-learn numpy pandas
+```
+
+Outputs (default `artifacts/embedding_cnn/al_embeddings_results/`):
+- `{classifier}_metrics.csv` — per-round test accuracy/F1 and pool sizes
+- `{classifier}_queries.csv` — query history across rounds
+- `{classifier}_summary.json` — run summary and paths
+
+Note: ensure embeddings exist before running (see the embedding CNN step above).
+
 ## 4) Run Full-Loop Active Learning
 Run iterative AL rounds (train -> query -> add queried samples -> retrain):
 
