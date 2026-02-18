@@ -177,26 +177,30 @@ python -m src.active_learning.simulate --data-root data/synth_surface_defects --
 ```
 
 ## 7) Streamlit MVP App
-Launch the app:
+
+There are two Streamlit apps in this repo:
+
+- `app.py` — the human-in-the-loop labeling app used for image labeling and full AL workflow.
+- `app_al_demo.py` — a lightweight interactive Active Learning demo (synthetic or embeddings-based) intended for demonstrations and teaching.
+
+Launch the demo app (recommended for quick interactive experiments):
 
 ```powershell
-streamlit run app.py
+streamlit run app_al_demo.py
 ```
 
-What it provides:
-- Batch labeling UI (multiple images at once)
-- Proper AL workflow tab:
-  - initialize AL session
-  - run next round (train + query)
-  - label queried batch
-  - finalize labels to move them into labeled pool
-- Metrics dashboard:
-  - baseline: train/val accuracy and loss by epoch
-  - AL: test/best-val accuracy by round
+In `app_al_demo.py`:
+- Choose `Synthetic` to use an on-the-fly generated dataset.
+- Or choose `Upload .npz embeddings` to upload a local `.npz` containing arrays `X`/`y` or `embeddings`/`labels`.
+- Or choose `Use artifacts embeddings` to pick from precomputed embeddings in `artifacts/embedding_cnn/embeddings` (if present).
 
-App label storage:
-- Human labels are saved to: `artifacts/labels/human_labels.csv`
-- Training/AL can use these labels as overrides.
+Controls:
+- Select classifier and acquisition strategy (random, least_confidence, margin, entropy).
+- Set `Seed labeled size`, `Query size`, and `Rounds`.
+- `Initialize` prepares the pool and computes a random baseline.
+- `Next` labels one batch and retrains; `Run all` completes the remaining rounds.
+
+The demo shows an F1 (macro) learning curve and compares the selected strategy to the simulated random baseline. Use `Use artifacts embeddings` to demo using your project's precomputed embeddings.
 
 ## Notes
 - If `torch` is not installed, training and AL scripts will fail to import.
