@@ -28,6 +28,9 @@ def uncertainty_from_probs(probs: np.ndarray, strategy: str) -> np.ndarray:
         top1 = -part[:, 0]
         top2 = -part[:, 1]
         return 1.0 - (top1 - top2)
+    if strategy == "random":
+        # uniform utility values for random sampling
+        return np.ones(probs.shape[0], dtype=np.float32)
     raise ValueError(f"Unknown strategy: {strategy}")
 
 
