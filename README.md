@@ -20,6 +20,24 @@ python -m pip install -r requirements.txt
 # PyTorch with the appropriate CUDA runtime (https://pytorch.org/get-started/locally/).
 ```
 
+### Docker Usage
+A container image is provided for reproducible execution. Build and run using the `e3ailab/al-tutorial` repository name:
+
+```bash
+# build the image (run from project root)
+docker build -t e3ailab/al-tutorial .
+
+# run the container; it will expose Jupyter on port 8888
+docker run --rm -p 8888:8888 e3ailab/al-tutorial
+```
+
+Once started, open `http://localhost:8888` in your browser to access the notebooks. The image already contains the repo files and installs dependencies from `requirements.txt`.
+
+You can also execute commands inside the container via `docker exec` or modify the Dockerfile as needed.
+
+## 2) Generate Dataset
+
+
 ## 2) Generate Dataset
 Generate 1,000 images (old output is removed automatically before generation):
 
