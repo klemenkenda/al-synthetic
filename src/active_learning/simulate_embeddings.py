@@ -312,7 +312,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed-size", type=int, default=80)
     parser.add_argument("--rounds", type=int, default=5)
     parser.add_argument("--query-size", type=int, default=50)
-    parser.add_argument("--strategy", type=str, default="entropy", choices=["entropy", "margin", "least_confidence"])
+    parser.add_argument("--strategy", type=str, default="entropy", choices=["random", "entropy", "margin", "least_confidence"],
+                        help="Sampling strategy used when querying; `random` ignores probabilities.")
     parser.add_argument("--diversity", action="store_true")
     parser.add_argument("--out-dir", type=Path, default=None)
     parser.add_argument("--seed", type=int, default=42)

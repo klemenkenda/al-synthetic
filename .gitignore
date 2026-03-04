@@ -9,3 +9,5 @@ node_modules/
 */__pychache__/
 *.pyc
 *.pkl
+*/*.pyc
+*/*/*.pyc

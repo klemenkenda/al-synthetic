@@ -69,7 +69,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--rounds", type=int, default=5)
     parser.add_argument("--epochs-per-round", type=int, default=8)
     parser.add_argument("--query-size", type=int, default=50)
-    parser.add_argument("--strategy", type=str, default="entropy", choices=["entropy", "margin", "least_confidence"])
+    parser.add_argument("--strategy", type=str, default="entropy", choices=["random", "entropy", "margin", "least_confidence"],
+                        help="Sampling strategy; `random` ignores model uncertainty.")
     parser.add_argument("--diversity", action="store_true", help="Enable greedy diversity in embedding space.")
     parser.add_argument("--seed-size", type=int, default=80, help="Initial labeled set size sampled from train split.")
     parser.add_argument("--seed", type=int, default=42)
@@ -94,6 +95,9 @@ def uncertainty_scores(probs: torch.Tensor, strategy: str) -> torch.Tensor:
     if strategy == "margin":
         top2 = torch.topk(probs, k=2, dim=1).values
         return 1.0 - (top2[:, 0] - top2[:, 1])
+    if strategy == "random":
+        # uniform utility; downstream code may apply diversity if requested
+        return torch.ones(probs.size(0), device=probs.device, dtype=probs.dtype)
     raise ValueError(f"Unsupported strategy: {strategy}")
 
 
